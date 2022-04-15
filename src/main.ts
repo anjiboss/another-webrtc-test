@@ -1,3 +1,7 @@
+import "toastify-js/src/toastify.css";
+import Toastify from "toastify-js";
+
+// -------------------------------
 import io from "socket.io-client";
 import { server_uri } from "./ultis/constant";
 export const socket = io(server_uri, { reconnection: false });
@@ -164,8 +168,12 @@ callButton.onclick = async () => {
 socket.on("get-offer", ({ offer }) => {
   console.log("get-offer");
   answerButton.disabled = false;
-
+  Toastify({
+    text: "Incoming call....\n Click Answer Buton",
+    stopOnFocus: true,
+  }).showToast();
   answerButton.onclick = async () => {
+    answerButton.disabled = true;
     localConnection.onicecandidate = (event) => {
       if (event.candidate) {
         // ANCHOR Sending candidate
