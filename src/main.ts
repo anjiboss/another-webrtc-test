@@ -12,18 +12,7 @@ const webcamButton = document.getElementById(
 const webcamVideo = document.getElementById("webcamVideo") as HTMLVideoElement;
 const remoteVideo = document.getElementById("remoteVideo") as HTMLVideoElement;
 const callButton = document.getElementById("callButton") as HTMLButtonElement;
-// const offerInput = document.getElementById("offerInput") as HTMLInputElement;
-// const answerInput = document.getElementById("answerInput") as HTMLInputElement;
-// const messageInput = document.getElementById("message") as HTMLInputElement;
-// const answerButton = document.getElementById(
-//   "answerButton"
-// ) as HTMLButtonElement;
-// const acceptButton = document.getElementById(
-//   "acceptButton"
-// ) as HTMLButtonElement;
-// const messageButton = document.getElementById(
-//   "messageButton"
-// ) as HTMLButtonElement;
+const answerButton = document.getElementById("answer") as HTMLButtonElement;
 
 // ANCHOR Define WebRTC Connection
 const localConnection = new RTCPeerConnection({
@@ -172,39 +161,36 @@ callButton.onclick = async () => {
 };
 
 // Peer B
-socket.on("get-offer", async ({ offer }) => {
+socket.on("get-offer", ({ offer }) => {
   console.log("get-offer");
-  localConnection.onicecandidate = (event) => {
-    if (event.candidate) {
-      // ANCHOR Sending candidate
-      socket.emit("answer-send-candidate", {
-        candidate: event.candidate.toJSON(),
-      });
-    }
-  };
+  answerButton.disabled = false;
 
-  await localConnection
-    .setRemoteDescription(new RTCSessionDescription(offer))
-    .then(async () => {
-      console.log("set offer as remote description");
-      if (offerQued.length > 0) {
-        for (let i = 0; i < offerQued.length; i++) {
-          await localConnection.addIceCandidate(
-            new RTCIceCandidate(offerQued[i])
-          );
-        }
+  answerButton.onclick = async () => {
+    localConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        // ANCHOR Sending candidate
+        socket.emit("answer-send-candidate", {
+          candidate: event.candidate.toJSON(),
+        });
       }
-    });
-  const answerDescription = await localConnection.createAnswer();
-  await localConnection.setLocalDescription(answerDescription);
+    };
 
-  socket.emit("send-answer", { answer: answerDescription });
-  localConnection.onconnectionstatechange = () => {
-    console.log(
-      "%c connection state change: ",
-      "background: red; color: white",
-      localConnection.connectionState
-    );
+    await localConnection
+      .setRemoteDescription(new RTCSessionDescription(offer))
+      .then(async () => {
+        console.log("set offer as remote description");
+        if (offerQued.length > 0) {
+          for (let i = 0; i < offerQued.length; i++) {
+            await localConnection.addIceCandidate(
+              new RTCIceCandidate(offerQued[i])
+            );
+          }
+        }
+      });
+    const answerDescription = await localConnection.createAnswer();
+    await localConnection.setLocalDescription(answerDescription);
+
+    socket.emit("send-answer", { answer: answerDescription });
   };
 });
 
@@ -223,3 +209,11 @@ socket.on("add-offer-candidate", ({ offer }) => {
     );
   }
 });
+
+localConnection.onconnectionstatechange = () => {
+  console.log(
+    "%c connection state change: ",
+    "background: red; color: white",
+    localConnection.connectionState
+  );
+};
