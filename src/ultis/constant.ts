@@ -1,2 +1,2 @@
 // export const server_uri = "https://ancient-fjord-29801.herokuapp.com";
-export const server_uri = "http://localhost:5050";
+export const server_uri = "https://ancient-fjord-29801.herokuapp.com";
