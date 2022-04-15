@@ -111,56 +111,14 @@ webcamButton.onclick = async () => {
 };
 // !SECTION
 
-// // 2. Create Call (Offer)
-// callButton.onclick = async () => {
-//   const offerDescription = await localConnection.createOffer();
-//   await localConnection.setLocalDescription(offerDescription);
-//   navigator.clipboard.writeText(JSON.stringify(offerDescription));
-//   console.log("set local description", offerDescription);
-
-//   //ANCHOR Set-up new candidate event
-//   localConnection.onicecandidate = (e) => {
-//     console.log({ candidate: e.candidate, json: e.candidate?.toJSON() });
-//   };
-// };
-
-// // 3. Take offer and create Answer
-// answerButton.onclick = async () => {
-//   const offer = JSON.parse(offerInput.value);
-
-//   // Set offer as remote description
-//   const offerDescription = new RTCSessionDescription(offer);
-//   console.log({ offerDescription });
-//   localConnection.setRemoteDescription(offerDescription);
-//   // Create answer
-//   const answerDescription = await localConnection.createAnswer();
-//   await localConnection.setLocalDescription(answerDescription);
-//   console.log({ answerDescription });
-//   navigator.clipboard.writeText(JSON.stringify(answerDescription));
-
-//   //ANCHOR Set-up new candidate event
-//   localConnection.onicecandidate = (e) => {
-//     console.log({ candidate: e.candidate, json: e.candidate?.toJSON() });
-//     if (e.candidate) {
-//       navigator.clipboard.writeText(JSON.stringify(e.candidate?.toJSON()));
-//     }
-//   };
-// };
-
-// // 4. Answered, add candidate to peer connection
-// acceptButton.onclick = async () => {
-//   const answer = JSON.parse(answerInput.value);
-//   const candidate = new RTCIceCandidate(answer);
-//   localConnection.addIceCandidate(candidate);
-// };
-
-const qued: any[] = [];
+const offerQued: any[] = [];
+const answerQued: any[] = [];
 
 // Peer A
 callButton.onclick = async () => {
   localConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      // FIXME Send event.candidate.toJson() to server
+      // ANCHOR Send event.candidate.toJson() to server
       socket.emit("offer-send-candidate", {
         candidate: event.candidate.toJSON(),
       });
@@ -171,19 +129,28 @@ callButton.onclick = async () => {
   const offerDescription = await localConnection.createOffer();
   await localConnection.setLocalDescription(offerDescription);
   // send offer to server
-  // FIXME Send offer to server
+  // ANCHOR Send offer to server
   socket.emit("send-offer", {
     offer: offerDescription,
   });
 
   // Listen for remote answer
-  // FIXME Take answer and set it to remoteDescription
+  // ANCHOR Take answer and set it to remoteDescription
   socket.on("answered", ({ answer }) => {
     console.log({ answer });
     if (!localConnection.currentRemoteDescription) {
-      localConnection.setRemoteDescription(answer).then(() => {
+      localConnection.setRemoteDescription(answer).then(async () => {
         console.log("set remote des");
+        if (answerQued.length > 0) {
+          for (let i = 0; i < answerQued.length; i++) {
+            await localConnection.addIceCandidate(
+              new RTCIceCandidate(answerQued[i])
+            );
+          }
+        }
       });
+    } else {
+      answerQued.push(answer);
     }
   });
 
@@ -209,7 +176,7 @@ socket.on("get-offer", async ({ offer }) => {
   console.log("get-offer");
   localConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      // FIXME Sending candidate
+      // ANCHOR Sending candidate
       socket.emit("answer-send-candidate", {
         candidate: event.candidate.toJSON(),
       });
@@ -220,9 +187,11 @@ socket.on("get-offer", async ({ offer }) => {
     .setRemoteDescription(new RTCSessionDescription(offer))
     .then(async () => {
       console.log("set offer as remote description");
-      if (qued.length > 0) {
-        for (let i = 0; i < qued.length; i++) {
-          await localConnection.addIceCandidate(new RTCIceCandidate(qued[i]));
+      if (offerQued.length > 0) {
+        for (let i = 0; i < offerQued.length; i++) {
+          await localConnection.addIceCandidate(
+            new RTCIceCandidate(offerQued[i])
+          );
         }
       }
     });
@@ -247,7 +216,7 @@ socket.on("add-offer-candidate", ({ offer }) => {
     const candidate = new RTCIceCandidate(offer);
     localConnection.addIceCandidate(candidate);
   } else {
-    qued.push(offer);
+    offerQued.push(offer);
     console.log(
       "%c Dont have remote description ",
       "background: red; color: white"
